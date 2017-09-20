@@ -1,0 +1,309 @@
+import connectK.CKPlayer;
+import connectK.BoardModel;
+import java.awt.Point;
+import java.util.Random;
+import java.util.Vector;
+import java.util.ArrayList;
+
+public class PaupersAI extends CKPlayer {
+
+	public Point adj[] = new Point[]{new Point(-1,-1),new Point(-1,0),new Point(-1,1),new Point(1,1),
+			new Point(1,0),new Point(1,-1),new Point(0,1),new Point(0,-1)};
+	//create adjacent spots arrays here to avoid unnecessarily recreating the array every time heuristic is called
+	private int currdepth;
+	public PaupersAI (byte player, BoardModel state) {
+		super(player, state);
+		teamName = "Paupers";
+		this.currdepth = 0;
+	}
+
+	@Override
+	public Point getMove(BoardModel state) {
+		this.startState = state.clone();
+//		for(int i=0; i<state.getWidth(); ++i)
+//			for(int j=0; j<state.getHeight(); ++j)
+//				if(state.getSpace(i, j) == 0)
+//					return new Point(i,j);
+//		return null;
+		
+//		Random random = new Random();
+//		int i,j;
+//		while(true){
+//			i = random.nextInt(state.getWidth());
+//			j = random.nextInt(state.getHeight());
+//			if(state.getSpace(i, j) == 0)
+//				return new Point(i,j);
+//		}
+		return minimax(state, this.player, 2);
+	}
+	
+	private byte alternate(byte player){ 
+		//alternates players for minimax and maxValue (this AI) and for minValue (opponent)
+		if (player == 1){
+			return 2;
+		}
+		return 1;
+	}
+	
+	private Point minimax(BoardModel state, byte player, int dlimit){
+		//have to change player for minValue b/c opponent moves during minValue
+		Point best = new Point();
+//		System.out.println("in minimax");
+		int alpha = Integer.MIN_VALUE;
+		int beta = Integer.MAX_VALUE;
+		int v = Integer.MIN_VALUE;
+//		int prev = v;
+		BoardModel copy = state.clone(); //create separate copy of original board
+		for (int row = 0; row < state.getWidth(); row++){
+			for (int col = 0; col < state.getHeight(); col++){
+				if (state.getSpace(row, col) == 0){ //don't want to put piece in an occupied spot
+					copy = state.placePiece(new Point(row, col), player);//apply(state, new Point(row, col), player);
+					//create separate copy of board with a new piece added
+					this.currdepth++;
+					v = Integer.max(v, minValue(copy, alternate(player), dlimit, alpha, beta));
+					this.currdepth--; //decrement here to avoid unnecessarily decrementing twice once we return from the last leaf
+					if (v > alpha){
+						alpha = v;
+						best.setLocation(row, col);
+					}
+//					if(prev != v){
+//						best.setLocation(row, col); 
+//						prev = v;
+//					}
+					if (state.gravityEnabled()){
+						break;
+					}
+				}
+//				this.currdepth++;
+//				v = Integer.max(v, minValue(copy, alternate(player), dlimit));
+//				if(prev != v){
+//					best.setLocation(row, col); 
+//					prev = v;
+//				}
+				//copy = state.clone();
+			}
+		}
+		return best;
+	}
+	
+	private int maxValue(BoardModel state, byte player, int dlimit, int alph, int bet){
+		byte p = state.winner();
+		if (p == player){
+			return Integer.MAX_VALUE;
+		}
+		if (p == alternate(player)){
+			return Integer.MIN_VALUE;
+		}
+		if (currdepth == dlimit || !state.hasMovesLeft()){
+//			this.currdepth--;
+			return heuristic(state, player);
+		}
+		//BoardModel copy; for non-void apply function
+		BoardModel copy = state.clone(); //for void apply function
+		int alpha = alph;
+		int beta = bet;
+		int v = Integer.MIN_VALUE;
+//		outerforloop:
+		for (int row = 0; row < state.getWidth(); row++){
+			for (int col = 0; col < state.getHeight(); col++){ 
+				//loop through board looking for all possible moves
+				if (state.getSpace(row, col) == 0){ //don't want to put piece in an occupied spot
+					copy = state.placePiece(new Point(row, col), player);//apply(new Point(row, col), player);
+					//create separate copy of board with a new piece added
+					this.currdepth++;
+					v = Integer.max(v, minValue(copy, alternate(player), dlimit, alpha, beta));
+					this.currdepth--; //decrement here to avoid unnecessarily decrementing twice once we return from the last leaf
+					if (v > alpha){
+						alpha = v;
+						if (alpha >= beta){
+							//break outerforloop;
+							return v;
+						}
+					}
+					if(state.gravityEnabled()){
+						break;
+					}
+				}//apply(copy, new Point(row, col), player);
+				
+//				this.currdepth++;
+//				v = Integer.max(v, minValue(copy, alternate(player), dlimit));
+				
+				//copy = state.clone(); //after testing an action, revert the copy back to original board
+				//increases time complexity
+			}
+		}
+//		this.currdepth--;
+		return v;
+	}
+	
+	private int minValue(BoardModel state, byte player, int dlimit, int alph, int bet){
+		byte p = state.winner();
+		if (p == player){
+			return Integer.MIN_VALUE;
+		}
+		if (p == alternate(player)){
+			return Integer.MAX_VALUE;
+		}
+		if (currdepth == dlimit || !state.hasMovesLeft()){
+//			this.currdepth--;
+			return heuristic(state, player);
+		}
+		//BoardModel copy; for non-void apply function
+		BoardModel copy = state.clone(); //for void apply function
+		int alpha = alph;
+		int beta = bet;
+		int v = Integer.MAX_VALUE;
+//		System.out.println(this.currdepth);
+		for (int row = 0; row < state.getWidth(); row++){
+			for (int col = 0; col < state.getHeight(); col++){
+				//loop through board looking for all possible moves
+				if (state.getSpace(row, col) == 0){ //don't want to put piece in an occupied spot
+					copy = state.placePiece(new Point(row, col), player);//apply(new Point(row, col), player);
+					//create separate copy of board with a new piece added
+					this.currdepth++;
+					v = Integer.min(v, maxValue(copy, alternate(player), dlimit, alpha, beta));
+					this.currdepth--; //decrement here to avoid unnecessarily decrementing twice once we return from the last leaf
+					if (v < beta){
+						beta = v;
+						if (alpha >= beta){
+							return v;
+						}
+					}
+					if(state.gravityEnabled()){
+						break;
+					}
+				}//apply(copy, new Point(row, col), player);
+				
+//				this.currdepth++;
+//				v = Integer.min(v, maxValue(copy, alternate(player), dlimit));
+				
+				//copy = state.clone(); //after testing an action, revert the copy back to original board
+							//increases time complexity
+			}
+		}
+//		this.currdepth--;
+		return v;
+	}
+	
+	private BoardModel apply(Point position,byte player){
+		BoardModel copy = startState;
+		return copy.placePiece(position, player);
+	}
+	
+//	private BoardModel apply(BoardModel copied, Point position,byte player){
+//		return copied.placePiece(position, player); 
+//		//modifies copied board. Place piece in a separate function
+//		//Should save space
+//	}
+	
+	private int heuristic(BoardModel state,byte player){
+		int win = 0;
+		//problem with heuristic function, checking win lines is not working
+		
+//		if (state.gravityEnabled()){
+//			for (int i = 0; i < state.getWidth(); ++i){
+//				for (int j = 0; j < state.getHeight(); ++j){
+//					
+//				}
+//			}
+//		}
+		
+		for(int i=0; i<state.getWidth(); ++i){
+			for(int j=0; j<state.getHeight(); ++j){
+				if(state.getSpace(i, j) != alternate(player)){//state.getSpace(i, j) == player//){
+						//|| state.getSpace(i,j) == 0){
+					for(Point p: adj){
+						ArrayList<Byte> kpieces = new ArrayList<Byte>(); 
+						//for counting how many pieces of self.ai are in a possible win line
+						int in_a_row = 1; // current spot has a piece so count it as part of in-a-row
+						int weighted_value = 0;
+						int check_width = i + p.x;
+						int check_height = j + p.y;
+						while(bound_check(check_width, check_height) && (state.getSpace(check_width, check_height) != alternate(player))){
+							kpieces.add(state.getSpace(check_width, check_height));
+//							if (state.getSpace(check_width, check_height) == player){// && state.getSpace(check_width, check_height) == state.getSpace(check_width - p.x, check_height - p.y)){
+//								weighted_value += 10;
+//							}
+//							else{
+//								weighted_value++;
+//							}
+							check_width += p.x; //actually, height is associated with rows, which is associated with y 
+							check_height += p.y;
+//							++in_a_row;
+							if(++in_a_row == state.getkLength()){
+								win += countk(kpieces, player);
+//								++win;
+								break;
+							}
+						}
+					}
+				}
+//				else if (state.getSpace(i, j) == alternate(player)){
+//					for(Point p: adj){
+//						int in_a_row = 1; // current spot has a piece so count it as part of in-a-row
+//						int check_width = i + p.x;
+//						int check_height = j + p.y;
+//						while(bound_check(check_width, check_height) && (state.getSpace(check_width, check_height) != player)){
+//							check_width += p.x;
+//							check_height += p.y;
+////							++in_a_row;
+//							if(++in_a_row == state.kLength){
+//								--win;
+//								break;
+//							}
+//						}
+//					}
+//				}
+			}
+		}
+		for (int i = 0; i < state.getWidth(); i++){
+			for (int j = 0; j < state.getHeight(); j++){
+				if (state.getSpace(i, j) != player){//state.getSpace(i, j) == alternate(player)){
+					for(Point p: adj){
+						ArrayList<Byte> kpieces = new ArrayList<Byte>();
+						//for counting how opponent pieces are in a possible win line
+						int in_a_row = 1; // current spot has a piece so count it as part of in-a-row
+						int check_width = i + p.x;
+						int check_height = j + p.y;
+						while(bound_check(check_width, check_height) && (state.getSpace(check_width, check_height) != player)){
+							kpieces.add(state.getSpace(check_width, check_height));
+							check_width += p.x;
+							check_height += p.y;
+//							++in_a_row;
+							if(++in_a_row == state.getkLength()){
+								win -= countk(kpieces, alternate(player));
+//								--win;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		return win;
+	}
+	
+	private int countk(ArrayList<Byte> klist, byte interest){
+		int c = 0;
+		for (int i = 0; i < klist.size(); i++){
+			if(klist.get(i) == interest){
+				c += 10;
+			}
+			else{
+				c++;
+			}
+		}
+		return c; //return weighted value
+	}
+	
+	private Boolean bound_check(int curr_x, int curr_y){//, int pointx, int pointy){
+		return (curr_x >= 0) && (curr_y >= 0)
+				&& (curr_x < this.startState.getWidth())
+				&& (curr_y < this.startState.getHeight());
+	}
+
+	@Override
+	public Point getMove(BoardModel state, int deadline) {
+		return getMove(state);
+	}
+}
